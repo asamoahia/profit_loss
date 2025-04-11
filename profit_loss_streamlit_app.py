@@ -1,0 +1,254 @@
+# %% streamlit_app.py
+import pandas as pd
+import streamlit as st
+from io import BytesIO
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from fpdf import FPDF
+import tempfile
+
+# === Streamlit Page Setup ===
+st.set_page_config(page_title="Profit & Loss - Full Year", layout="wide")
+st.title("📊 Full-Year Profit & Loss Statement")
+st.caption("Track your business performance month-by-month")
+
+# === Persistent Logo Upload ===
+if "logo" not in st.session_state:
+    st.session_state.logo = None
+
+uploaded_logo = st.file_uploader("Upload your business logo (PNG or JPG)", type=["png", "jpg", "jpeg"])
+if uploaded_logo:
+    st.session_state.logo = uploaded_logo
+
+logo_file = st.session_state.logo
+
+# === Constants ===
+months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+target_length = 12
+
+# === Sidebar Filters ===
+month_filter = st.sidebar.selectbox("Select Month", ["All"] + months)
+tax_rate = st.sidebar.number_input("Tax Rate (%)", min_value=0.0, max_value=100.0, value=10.0)
+growth_rate = st.sidebar.number_input("Expected Growth Rate (%)", min_value=0.0, max_value=100.0, value=5.0)
+
+# === Business Info ===
+col1, col2 = st.columns(2)
+with col1:
+    business_name = st.text_input("Business Name", "My Small Business")
+with col2:
+    report_year = st.text_input("Year", "2025")
+
+# === Monthly Input Helper ===
+def monthly_inputs(label, default=0.0):
+    st.markdown(f"**{label}**")
+    return [st.number_input(f"{label} - {month}", min_value=0.0, value=default, step=0.01, key=f"{label}_{i}") for i, month in enumerate(months)]
+
+# === COLUMNS SECTION START ===
+col_rev, col_exp, col_res = st.columns(3)
+
+# --- Revenue and Targets ---
+with col_rev:
+    st.subheader("💰 Revenue & Targets (Monthly)")
+    revenue = monthly_inputs("Revenue")
+    target_revenue = monthly_inputs("Target Revenue")
+
+# --- Expenses Breakdown ---
+with col_exp:
+    st.subheader("🧾 Expenses (Monthly)")
+
+    marketing = monthly_inputs("Marketing")
+    salaries = monthly_inputs("Salaries")
+    utilities = monthly_inputs("Utilities")
+    rent = monthly_inputs("Rent")
+    other_expenses = monthly_inputs("Other Expenses")
+
+    # Custom Expenses
+    st.markdown("**Add Custom Expense Categories**")
+    custom_categories_input = st.text_input("Comma-separated (e.g., Taxes, Insurance)", "Taxes, Insurance")
+    custom_expense_categories = [c.strip() for c in custom_categories_input.split(',') if c.strip()]
+
+    custom_expenses_data = {}
+    for cat in custom_expense_categories:
+        custom_expenses_data[cat] = monthly_inputs(cat)
+
+# --- COGS, Projections & Results ---
+with col_res:
+    st.subheader("⚙️ COGS & Projections (Monthly)")
+    cogs = monthly_inputs("COGS")
+    target_expenses = monthly_inputs("Target Expenses")
+
+# === Calculations ===
+
+# Total Fixed Expenses per Month
+fixed_expenses = [sum(x) for x in zip(marketing, salaries, utilities, rent, other_expenses)]
+
+# Total Custom Expenses per Month
+custom_totals = [sum(custom_expenses_data[cat][i] for cat in custom_expense_categories) for i in range(12)]
+
+# Total Expenses = Fixed + Custom
+total_expenses = [f + c for f, c in zip(fixed_expenses, custom_totals)]
+
+# Gross Profit = Revenue - COGS
+gross_profit = [rev - cost for rev, cost in zip(revenue, cogs)]
+
+# Net Profit = Gross - Expenses
+net_profit = [gp - exp for gp, exp in zip(gross_profit, total_expenses)]
+
+# Taxes
+taxes = [np * (tax_rate / 100) for np in net_profit]
+net_profit_after_tax = [np - tax for np, tax in zip(net_profit, taxes)]
+
+# Projections
+projected_revenue = [rev * (1 + growth_rate / 100) for rev in revenue]
+projected_expenses = [exp * (1 + growth_rate / 100) for exp in total_expenses]
+projected_net_profit = [r - e for r, e in zip(projected_revenue, projected_expenses)]
+
+# Variance Calculations
+revenue_variance = [rev - tgt for rev, tgt in zip(revenue, target_revenue)]
+expense_variance = [exp - tgt for exp, tgt in zip(total_expenses, target_expenses)]
+
+# === Final DataFrame Construction ===
+df = pd.DataFrame({
+    "Month": months,
+    "Revenue": revenue,
+    "Target Revenue": target_revenue,
+    "Revenue Variance": revenue_variance,
+    "COGS": cogs,
+    "Gross Profit": gross_profit,
+    "Total Expenses": total_expenses,
+    "Target Expenses": target_expenses,
+    "Expense Variance": expense_variance,
+    "Net Profit": net_profit,
+    f"Taxes ({tax_rate}%)": taxes,
+    "Net Profit After Tax": net_profit_after_tax,
+    "Projected Revenue": projected_revenue,
+    "Projected Expenses": projected_expenses,
+    "Projected Net Profit": projected_net_profit
+})
+
+# Add a total row
+if month_filter == "All":
+    total_row = {
+        "Month": "Total",
+        "Revenue": sum(revenue),
+        "Target Revenue": sum(target_revenue),
+        "Revenue Variance": sum(revenue_variance),
+        "COGS": sum(cogs),
+        "Gross Profit": sum(gross_profit),
+        "Total Expenses": sum(total_expenses),
+        "Target Expenses": sum(target_expenses),
+        "Expense Variance": sum(expense_variance),
+        "Net Profit": sum(net_profit),
+        f"Taxes ({tax_rate}%)": sum(taxes),
+        "Net Profit After Tax": sum(net_profit_after_tax),
+        "Projected Revenue": sum(projected_revenue),
+        "Projected Expenses": sum(projected_expenses),
+        "Projected Net Profit": sum(projected_net_profit)
+    }
+    df.loc[len(df)] = total_row
+
+# Apply month filter
+df_filtered = df[df["Month"] == month_filter] if month_filter != "All" else df
+
+# === Display DataFrame ===
+st.markdown("### 📋 P&L Summary Table")
+st.dataframe(df_filtered.style.format(
+    {col: "${:,.2f}" for col in df_filtered.select_dtypes(include=['number']).columns}
+), use_container_width=True)
+
+# === Charts ===
+
+# Net Profit Trend
+st.markdown("### 📈 Monthly Net Profit After Tax vs Projected")
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(df_filtered["Month"], df_filtered["Net Profit After Tax"], marker='o', label="Actual")
+ax.plot(df_filtered["Month"], df_filtered["Projected Net Profit"], marker='x', linestyle='--', label="Projected")
+ax.set_ylabel("Amount ($)")
+ax.set_title("Net Profit After Tax vs Projected")
+ax.legend()
+ax.grid(True)
+st.pyplot(fig)
+
+# Revenue Variance
+st.markdown("### 📊 Revenue Variance")
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.bar(df_filtered["Month"], df_filtered["Revenue Variance"], color='teal')
+ax.set_ylabel("Variance ($)")
+ax.set_title("Revenue Variance (Actual vs Target)")
+ax.grid(True)
+st.pyplot(fig)
+
+# Expense Variance
+st.markdown("### 📊 Expense Variance")
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.bar(df_filtered["Month"], df_filtered["Expense Variance"], color='orange')
+ax.set_ylabel("Variance ($)")
+ax.set_title("Expense Variance (Actual vs Target)")
+ax.grid(True)
+st.pyplot(fig)
+
+# === Excel Download ===
+excel_output = BytesIO()
+with pd.ExcelWriter(excel_output, engine='xlsxwriter') as writer:
+    df.to_excel(writer, sheet_name="P&L Summary", index=False)
+    workbook = writer.book
+    worksheet = writer.sheets["P&L Summary"]
+
+    # Add a sample chart to Excel
+    fig, ax = plt.subplots()
+    ax.plot(df["Month"], df["Net Profit"], marker='o')
+    ax.set_title("Monthly Net Profit")
+    chart_img = BytesIO()
+    fig.savefig(chart_img, format='png')
+    chart_img.seek(0)
+    worksheet.insert_image("R2", "net_profit_chart.png", {"image_data": chart_img})
+
+st.download_button(
+    label="📥 Download Excel Report",
+    data=excel_output.getvalue(),
+    file_name="P&L_Report.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+
+# === PDF Download ===
+def create_pdf(dataframe):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="P&L Summary Report", ln=True, align='C')
+
+    pdf.set_font("Arial", size=8)
+    col_width = pdf.w / (len(dataframe.columns) + 1)
+    row_height = 6
+
+    # Header
+    for col in dataframe.columns:
+        pdf.cell(col_width, row_height, str(col)[:12], border=1)
+    pdf.ln(row_height)
+
+    # Rows
+    for i in range(len(dataframe)):
+        for col in dataframe.columns:
+            val = str(dataframe.iloc[i][col])
+            pdf.cell(col_width, row_height, val[:12], border=1)
+        pdf.ln(row_height)
+
+    # Add a chart
+    fig, ax = plt.subplots()
+    ax.plot(df["Month"], df["Net Profit"], marker='o')
+    ax.set_title("Monthly Net Profit")
+    chart_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+    plt.tight_layout()
+    plt.savefig(chart_path)
+    pdf.image(chart_path, x=10, y=None, w=180)
+
+    return pdf.output(dest="S").encode("latin-1")
+
+pdf_data = create_pdf(df)
+st.download_button(
+    label="📄 Download PDF Report",
+    data=pdf_data,
+    file_name="P&L_Report.pdf",
+    mime="application/pdf"
+)
