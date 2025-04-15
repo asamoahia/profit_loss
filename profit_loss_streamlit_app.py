@@ -1,9 +1,9 @@
 # %% streamlit_app.py
 import pandas as pd
 import streamlit as st
-from io import BytesIO
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+import plotly.express as px
+from io import BytesIO
 from fpdf import FPDF
 import tempfile
 
@@ -29,6 +29,8 @@ target_length = 12
 
 # === Sidebar Filters ===
 month_filter = st.sidebar.selectbox("Select Month", ["All"] + months)
+multi_months_filter = st.sidebar.multiselect("Select Multiple Months for Comparison", months)
+
 tax_rate = st.sidebar.number_input("Tax Rate (%)", min_value=0.0, max_value=100.0, value=10.0)
 growth_rate = st.sidebar.number_input("Expected Growth Rate (%)", min_value=0.0, max_value=100.0, value=5.0)
 
@@ -39,10 +41,31 @@ with col1:
 with col2:
     report_year = st.text_input("Year", "2025")
 
-# === Monthly Input Helper ===
+# Monthly Input Helper Function
 def monthly_inputs(label, default=0.0):
     st.markdown(f"**{label}**")
-    return [st.number_input(f"{label} - {month}", min_value=0.0, value=default, step=0.01, key=f"{label}_{i}") for i, month in enumerate(months)]
+    input_values = []
+    
+    for i, month in enumerate(months):
+        key = f"{label}_{i}"
+        
+        # Initialize session state value before widget creation
+        if key not in st.session_state:
+            st.session_state[key] = default  # Set default value if not set already
+        
+        # Only use session state value if the user hasn't set one for this widget
+        value = st.session_state[key]  # Get value from session state
+        
+        # Use the session state value directly as the value, without setting it again as default in the widget
+        input_value = st.number_input(f"{label} - {month}", min_value=0.0, value=value, step=0.01, key=key)
+        
+        # Store the new value into session state only if it's updated
+        if input_value != value:
+            st.session_state[key] = input_value
+        
+        input_values.append(input_value)
+        
+    return input_values
 
 # === COLUMNS SECTION START ===
 col_rev, col_exp, col_res = st.columns(3)
@@ -157,36 +180,23 @@ st.dataframe(df_filtered.style.format(
     {col: "${:,.2f}" for col in df_filtered.select_dtypes(include=['number']).columns}
 ), use_container_width=True)
 
-# === Charts ===
+# === Interactive Plotly Charts ===
 
 # Net Profit Trend
 st.markdown("### 📈 Monthly Net Profit After Tax vs Projected")
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.plot(df_filtered["Month"], df_filtered["Net Profit After Tax"], marker='o', label="Actual")
-ax.plot(df_filtered["Month"], df_filtered["Projected Net Profit"], marker='x', linestyle='--', label="Projected")
-ax.set_ylabel("Amount ($)")
-ax.set_title("Net Profit After Tax vs Projected")
-ax.legend()
-ax.grid(True)
-st.pyplot(fig)
+fig = px.line(df_filtered, x="Month", y=["Net Profit After Tax", "Projected Net Profit"],
+              title="Net Profit After Tax vs Projected", markers=True)
+st.plotly_chart(fig)
 
 # Revenue Variance
 st.markdown("### 📊 Revenue Variance")
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.bar(df_filtered["Month"], df_filtered["Revenue Variance"], color='teal')
-ax.set_ylabel("Variance ($)")
-ax.set_title("Revenue Variance (Actual vs Target)")
-ax.grid(True)
-st.pyplot(fig)
+fig = px.bar(df_filtered, x="Month", y="Revenue Variance", title="Revenue Variance (Actual vs Target)", color="Revenue Variance")
+st.plotly_chart(fig)
 
 # Expense Variance
 st.markdown("### 📊 Expense Variance")
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.bar(df_filtered["Month"], df_filtered["Expense Variance"], color='orange')
-ax.set_ylabel("Variance ($)")
-ax.set_title("Expense Variance (Actual vs Target)")
-ax.grid(True)
-st.pyplot(fig)
+fig = px.bar(df_filtered, x="Month", y="Expense Variance", title="Expense Variance (Actual vs Target)", color="Expense Variance")
+st.plotly_chart(fig)
 
 # === Excel Download ===
 excel_output = BytesIO()
@@ -195,7 +205,7 @@ with pd.ExcelWriter(excel_output, engine='xlsxwriter') as writer:
     workbook = writer.book
     worksheet = writer.sheets["P&L Summary"]
 
-    # Add a sample chart to Excel
+    # Chart Image
     fig, ax = plt.subplots()
     ax.plot(df["Month"], df["Net Profit"], marker='o')
     ax.set_title("Monthly Net Profit")
@@ -222,19 +232,16 @@ def create_pdf(dataframe):
     col_width = pdf.w / (len(dataframe.columns) + 1)
     row_height = 6
 
-    # Header
     for col in dataframe.columns:
         pdf.cell(col_width, row_height, str(col)[:12], border=1)
     pdf.ln(row_height)
 
-    # Rows
     for i in range(len(dataframe)):
         for col in dataframe.columns:
             val = str(dataframe.iloc[i][col])
             pdf.cell(col_width, row_height, val[:12], border=1)
         pdf.ln(row_height)
 
-    # Add a chart
     fig, ax = plt.subplots()
     ax.plot(df["Month"], df["Net Profit"], marker='o')
     ax.set_title("Monthly Net Profit")
