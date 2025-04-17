@@ -34,7 +34,12 @@ st.caption("Track your business performance month-by-month")
 
 # === Business Selection ===
 available_businesses = ["Reclam Inc.", "Distinct Ent.", "Riverside Worship Ministries"]
-selected_business = st.sidebar.selectbox("Select Your Business", available_businesses)
+query_business = st.query_params.get("business", [None])[0]
+
+# Match with available businesses (case-insensitive)
+business_map = {b.replace(" ", "_").lower(): b for b in available_businesses}
+selected_business = business_map.get(query_business, available_businesses[0])
+selected_business = st.sidebar.selectbox("Select Your Business", available_businesses, index=available_businesses.index(selected_business))
 
 # Update the URL with the selected business name
 st.query_params["business"] = selected_business.replace(" ", "_").lower()
