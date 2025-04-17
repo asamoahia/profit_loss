@@ -6,11 +6,33 @@ import plotly.express as px
 from io import BytesIO
 from fpdf import FPDF
 import tempfile
+import json
+import os
+
+#Store User Data
+DATA_FILE = "stored_values.json"
+
+# Load and Save Session Values
+def save_session_data():
+    data = {key: st.session_state[key] for key in st.session_state if isinstance(st.session_state[key], (int, float, str, bool, list))}
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f)
+
+def load_session_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r") as f:
+            data = json.load(f)
+            for key, value in data.items():
+                if key not in st.session_state:
+                    st.session_state[key] = value
 
 # === Streamlit Page Setup ===
 st.set_page_config(page_title="Profit & Loss - Full Year", layout="wide")
 st.title("📊 Full-Year Profit & Loss Statement")
 st.caption("Track your business performance month-by-month")
+
+# Load stored values (if available)
+load_session_data()
 
 # === Persistent Logo Upload ===
 if "logo" not in st.session_state:
@@ -33,6 +55,12 @@ multi_months_filter = st.sidebar.multiselect("Select Multiple Months for Compari
 
 tax_rate = st.sidebar.number_input("Tax Rate (%)", min_value=0.0, max_value=100.0, value=10.0)
 growth_rate = st.sidebar.number_input("Expected Growth Rate (%)", min_value=0.0, max_value=100.0, value=5.0)
+
+if st.sidebar.button("Reset All Data"):
+    if os.path.exists(DATA_FILE):
+        os.remove(DATA_FILE)
+    st.session_state.clear()
+    st.experimental_rerun()
 
 # === Business Info ===
 col1, col2 = st.columns(2)
@@ -100,6 +128,9 @@ with col_res:
     st.subheader("⚙️ COGS & Projections (Monthly)")
     cogs = monthly_inputs("COGS")
     target_expenses = monthly_inputs("Target Expenses")
+
+# Capture All Inputs
+save_session_data()
 
 # === Calculations ===
 
