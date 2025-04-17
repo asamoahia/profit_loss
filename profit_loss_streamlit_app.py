@@ -33,7 +33,7 @@ st.title("📊 Full-Year Profit & Loss Statement")
 st.caption("Track your business performance month-by-month")
 
 # === Business Selection ===
-available_businesses = ["Starbucks", "Target", "MyCo", "New Business"]
+available_businesses = ["Reclam Inc.", "Distinct Ent.", "Riverside Worship Ministries"]
 selected_business = st.sidebar.selectbox("Select Your Business", available_businesses)
 st.session_state["business_name"] = selected_business
 
