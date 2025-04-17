@@ -118,6 +118,9 @@ gross_profit = [rev - cost for rev, cost in zip(revenue, cogs)]
 # Net Profit = Gross - Expenses
 net_profit = [gp - exp for gp, exp in zip(gross_profit, total_expenses)]
 
+# Profit Margin (%) = (Net Profit / Revenue) * 100
+profit_margin = [(np / rev * 100) if rev != 0 else 0 for np, rev in zip(net_profit, revenue)]
+
 # Taxes
 taxes = [np * (tax_rate / 100) for np in net_profit]
 net_profit_after_tax = [np - tax for np, tax in zip(net_profit, taxes)]
@@ -143,6 +146,7 @@ df = pd.DataFrame({
     "Target Expenses": target_expenses,
     "Expense Variance": expense_variance,
     "Net Profit": net_profit,
+    "Profit Margin (%)": profit_margin,
     f"Taxes ({tax_rate}%)": taxes,
     "Net Profit After Tax": net_profit_after_tax,
     "Projected Revenue": projected_revenue,
@@ -198,6 +202,17 @@ st.markdown("### 📊 Expense Variance")
 fig = px.bar(df_filtered, x="Month", y="Expense Variance", title="Expense Variance (Actual vs Target)", color="Expense Variance")
 st.plotly_chart(fig)
 
+# Revenue Chart
+st.markdown("### 📈 Revenue Over Time")
+fig = px.line(df_filtered, x="Month", y="Revenue", title="Revenue Over Time", markers=True)
+st.plotly_chart(fig)
+
+# Profit or Loss Chart
+st.markdown("### 📈 Profit or Loss Over Time")
+fig = px.line(df_filtered, x="Month", y="Net Profit", title="Profit or Loss Over Time", markers=True)
+fig.add_scatter(x=df_filtered["Month"], y=[0]*len(df_filtered), mode='lines', name='Break-even', line=dict(dash='dash'))
+st.plotly_chart(fig)
+
 # === Excel Download ===
 excel_output = BytesIO()
 with pd.ExcelWriter(excel_output, engine='xlsxwriter') as writer:
@@ -213,6 +228,15 @@ with pd.ExcelWriter(excel_output, engine='xlsxwriter') as writer:
     fig.savefig(chart_img, format='png')
     chart_img.seek(0)
     worksheet.insert_image("R2", "net_profit_chart.png", {"image_data": chart_img})
+
+    # Profit Margin Chart
+    fig2, ax2 = plt.subplots()
+    ax2.plot(df["Month"], df["Profit Margin (%)"], marker='o')
+    ax2.set_title("Profit Margin (%) Over Time")
+    margin_chart_img = BytesIO()
+    fig2.savefig(margin_chart_img, format='png')
+    margin_chart_img.seek(0)
+    worksheet.insert_image("R20", "profit_margin_chart.png", {"image_data": margin_chart_img})
 
 st.download_button(
     label="📥 Download Excel Report",
@@ -232,23 +256,36 @@ def create_pdf(dataframe):
     col_width = pdf.w / (len(dataframe.columns) + 1)
     row_height = 6
 
+    # Table Header
     for col in dataframe.columns:
         pdf.cell(col_width, row_height, str(col)[:12], border=1)
     pdf.ln(row_height)
 
+    # Table Rows
     for i in range(len(dataframe)):
         for col in dataframe.columns:
             val = str(dataframe.iloc[i][col])
             pdf.cell(col_width, row_height, val[:12], border=1)
         pdf.ln(row_height)
 
-    fig, ax = plt.subplots()
-    ax.plot(df["Month"], df["Net Profit"], marker='o')
-    ax.set_title("Monthly Net Profit")
-    chart_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+    # Net Profit Chart
+    fig1, ax1 = plt.subplots()
+    ax1.plot(df["Month"], df["Net Profit"], marker='o')
+    ax1.axhline(0, color='gray', linestyle='--')
+    ax1.set_title("Monthly Net Profit")
+    chart_path1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
     plt.tight_layout()
-    plt.savefig(chart_path)
-    pdf.image(chart_path, x=10, y=None, w=180)
+    fig1.savefig(chart_path1)
+    pdf.image(chart_path1, x=10, y=None, w=180)
+
+    # Profit Margin Chart
+    fig2, ax2 = plt.subplots()
+    ax2.plot(df["Month"], df["Profit Margin (%)"], marker='o', color='green')
+    ax2.set_title("Profit Margin (%) Over Time")
+    chart_path2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+    plt.tight_layout()
+    fig2.savefig(chart_path2)
+    pdf.image(chart_path2, x=10, y=None, w=180)
 
     return pdf.output(dest="S").encode("latin-1")
 
