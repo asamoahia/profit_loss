@@ -13,9 +13,6 @@ import os
 if "reset_triggered" not in st.session_state:
     st.session_state.reset_triggered = False
 
-# Business-specific datafile
-DATA_FILE = f"stored_values_{selected_business.replace(' ', '_').lower()}.json"
-
 # Load and Save Session Values
 def save_session_data():
     data = {key: st.session_state[key] for key in st.session_state if isinstance(st.session_state[key], (int, float, str, bool, list))}
@@ -48,12 +45,38 @@ selected_business = st.sidebar.selectbox("Select Your Business", available_busin
 st.query_params["business"] = selected_business.replace(" ", "_").lower()
 st.session_state["business_name"] = selected_business
 
+# Business-specific datafile
+DATA_FILE = f"stored_values_{selected_business.replace(' ', '_').lower()}.json"
+
 # Load stored values (if available)
 load_session_data()
 
-# === Persistent Logo Upload ===
-if "logo" not in st.session_state:
-    st.session_state.logo = None
+if st.session_state.reset_triggered:
+    if os.path.exists(DATA_FILE):
+        os.remove(DATA_FILE)
+    st.session_state.clear()
+    st.session_state.reset_triggered = False
+    st.rerun()
+
+# === Business-specific logo handling ===
+business_id = selected_business.replace(" ", "_").lower()
+LOGO_FILE = f"logo_{business_id}.png"
+
+# Load logo from file if not already in session
+if f"logo_{business_id}" not in st.session_state:
+    if os.path.exists(LOGO_FILE):
+        with open(LOGO_FILE, "rb") as f:
+            st.session_state[f"logo_{business_id}"] = f.read()
+    else:
+        st.session_state[f"logo_{business_id}"] = None
+
+# Upload a new logo
+uploaded_logo = st.file_uploader("Upload your business logo (PNG or JPG)", type=["png", "jpg", "jpeg"])
+if uploaded_logo:
+    logo_bytes = uploaded_logo.read()
+    st.session_state[f"logo_{business_id}"] = logo_bytes
+    with open(LOGO_FILE, "wb") as f:
+        f.write(logo_bytes)
 
 uploaded_logo = st.file_uploader("Upload your business logo (PNG or JPG)", type=["png", "jpg", "jpeg"])
 if uploaded_logo:
