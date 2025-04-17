@@ -7,7 +7,7 @@ from io import BytesIO
 from fpdf import FPDF
 
 # === Get the business name from the URL ===
-query_params = st.experimental_get_query_params()
+query_params = st.query_params()
 business_name_from_url = query_params.get("business", [None])[0]
 
 if business_name_from_url:
