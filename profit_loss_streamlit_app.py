@@ -32,10 +32,35 @@ st.set_page_config(page_title="Profit & Loss - Full Year", layout="wide")
 st.title("📊 Full-Year Profit & Loss Statement")
 st.caption("Track your business performance month-by-month")
 
-# === Business Selection ===
-available_businesses = ["Reclam Inc.", "Distinct Ent.", "Riverside Worship Ministries"]
-selected_business = st.sidebar.selectbox("Select Your Business", available_businesses)
-st.session_state["business_name"] = selected_business
+# Define a JSON file to store available businesses
+BUSINESSES_FILE = "business_list.json"
+
+# Helper Functions
+def load_businesses():
+    if os.path.exists(BUSINESSES_FILE):
+        with open(BUSINESSES_FILE, "r") as f:
+            return json.load(f)
+    return ["Default Business"]
+
+def save_businesses(businesses):
+    with open(BUSINESSES_FILE, "w") as f:
+        json.dump(businesses, f)
+
+# === Load business list ===
+available_businesses = load_businesses()
+
+# === Business Selection UI ===
+st.sidebar.markdown("### Select or Create Business")
+selected_business = st.sidebar.selectbox("Select Existing Business", available_businesses)
+
+new_business = st.sidebar.text_input("Or Enter New Business Name")
+if st.sidebar.button("Create Business") and new_business.strip():
+    clean_name = new_business.strip()
+    if clean_name not in available_businesses:
+        available_businesses.append(clean_name)
+        save_businesses(available_businesses)
+        selected_business = clean_name  # Auto-select new one
+        st.experimental_rerun()  # Refresh to load new data file
 
 # Business-specific datafile
 DATA_FILE = f"stored_values_{selected_business.replace(' ', '_').lower()}.json"
