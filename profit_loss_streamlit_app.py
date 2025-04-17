@@ -35,10 +35,9 @@ st.caption("Track your business performance month-by-month")
 # === Business Selection ===
 available_businesses = ["Reclam Inc.", "Distinct Ent.", "Riverside Worship Ministries"]
 selected_business = st.sidebar.selectbox("Select Your Business", available_businesses)
-st.session_state["business_name"] = selected_business
 
 # Update the URL with the selected business name
-st.experimental_set_query_params(business=selected_business.replace(" ", "_").lower())
+st.query_params["business"] = selected_business.replace(" ", "_").lower()
 st.session_state["business_name"] = selected_business
 
 # Business-specific datafile
