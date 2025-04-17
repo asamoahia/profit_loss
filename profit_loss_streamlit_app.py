@@ -13,6 +13,9 @@ import os
 if "reset_triggered" not in st.session_state:
     st.session_state.reset_triggered = False
 
+# Set the data file path for storing session data
+DATA_FILE = "stored_values.json"
+
 # Load and Save Session Values
 def save_session_data():
     data = {key: st.session_state[key] for key in st.session_state if isinstance(st.session_state[key], (int, float, str, bool, list))}
@@ -62,7 +65,6 @@ if st.sidebar.button("Reset All Data"):
     st.experimental_rerun()  # Rerun immediately after setting the flag
 
 if st.session_state.reset_triggered:
-    DATA_FILE = "stored_values.json" 
     if os.path.exists(DATA_FILE):
         os.remove(DATA_FILE)
     st.session_state.clear()
