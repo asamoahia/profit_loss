@@ -13,6 +13,9 @@ import os
 if "reset_triggered" not in st.session_state:
     st.session_state.reset_triggered = False
 
+# Business-specific datafile
+DATA_FILE = f"stored_values_{selected_business.replace(' ', '_').lower()}.json"
+
 # Load and Save Session Values
 def save_session_data():
     data = {key: st.session_state[key] for key in st.session_state if isinstance(st.session_state[key], (int, float, str, bool, list))}
@@ -44,9 +47,6 @@ selected_business = st.sidebar.selectbox("Select Your Business", available_busin
 # Update the URL with the selected business name
 st.query_params["business"] = selected_business.replace(" ", "_").lower()
 st.session_state["business_name"] = selected_business
-
-# Business-specific datafile
-DATA_FILE = f"stored_values_{selected_business.replace(' ', '_').lower()}.json"
 
 # Load stored values (if available)
 load_session_data()
