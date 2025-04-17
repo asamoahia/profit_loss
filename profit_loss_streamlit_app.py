@@ -34,24 +34,29 @@ st.caption("Track your business performance month-by-month")
 
 # === Business Selection ===
 available_businesses = ["Reclam Inc.", "Distinct Ent.", "Riverside Worship Ministries"]
-selected_business = st.sidebar.selectbox("Select Your Business", available_businesses)
+business_map = {b.replace(" ", "_").lower(): b for b in available_businesses}
 
-# Track the selected business in session
+# Step 1: Get the business from URL query parameters
+query_params = st.query_params
+query_business_key = query_params.get("business", [None])[0] if "business" in query_params else None
+selected_from_query = business_map.get(query_business_key, available_businesses[0])
+
+# Step 2: Dropdown for user selection (uses query or default)
+selected_business = st.sidebar.selectbox("Select Your Business", available_businesses, index=available_businesses.index(selected_from_query))
+
+# Step 3: Rerun if business changed
 if "selected_business" not in st.session_state or st.session_state.selected_business != selected_business:
-    st.session_state.clear()  # Clear previous business's data
+    st.session_state.clear()
     st.session_state.selected_business = selected_business
     st.rerun()
 
-# Match with available businesses (case-insensitive)
-business_map = {b.replace(" ", "_").lower(): b for b in available_businesses}
-selected_business = business_map.get(query_business, available_businesses[0])
-selected_business = st.sidebar.selectbox("Select Your Business", available_businesses, index=available_businesses.index(selected_business))
-
-# Update the URL with the selected business name
+# Step 4: Update URL with current selection
 st.query_params["business"] = selected_business.replace(" ", "_").lower()
+
+# Step 5: Store selected business in session
 st.session_state["business_name"] = selected_business
 
-# Use selected business for data file
+# Step 6: Use selected business for data file
 business_id = selected_business.replace(" ", "_").lower()
 DATA_FILE = f"stored_values_{business_id}.json"
 
