@@ -34,7 +34,13 @@ st.caption("Track your business performance month-by-month")
 
 # === Business Selection ===
 available_businesses = ["Reclam Inc.", "Distinct Ent.", "Riverside Worship Ministries"]
-query_business = st.query_params.get("business", [None])[0]
+selected_business = st.sidebar.selectbox("Select Your Business", available_businesses)
+
+# Track the selected business in session
+if "selected_business" not in st.session_state or st.session_state.selected_business != selected_business:
+    st.session_state.clear()  # Clear previous business's data
+    st.session_state.selected_business = selected_business
+    st.rerun()
 
 # Match with available businesses (case-insensitive)
 business_map = {b.replace(" ", "_").lower(): b for b in available_businesses}
@@ -45,8 +51,9 @@ selected_business = st.sidebar.selectbox("Select Your Business", available_busin
 st.query_params["business"] = selected_business.replace(" ", "_").lower()
 st.session_state["business_name"] = selected_business
 
-# Business-specific datafile
-DATA_FILE = f"stored_values_{selected_business.replace(' ', '_').lower()}.json"
+# Use selected business for data file
+business_id = selected_business.replace(" ", "_").lower()
+DATA_FILE = f"stored_values_{business_id}.json"
 
 # Load stored values (if available)
 load_session_data()
