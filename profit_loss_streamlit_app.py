@@ -37,6 +37,10 @@ available_businesses = ["Reclam Inc.", "Distinct Ent.", "Riverside Worship Minis
 selected_business = st.sidebar.selectbox("Select Your Business", available_businesses)
 st.session_state["business_name"] = selected_business
 
+# Update the URL with the selected business name
+st.experimental_set_query_params(business=selected_business.replace(" ", "_").lower())
+st.session_state["business_name"] = selected_business
+
 # Business-specific datafile
 DATA_FILE = f"stored_values_{selected_business.replace(' ', '_').lower()}.json"
 
