@@ -14,7 +14,7 @@ if "reset_triggered" not in st.session_state:
     st.session_state.reset_triggered = False
 
 # Set the data file path for storing session data
-DATA_FILE = "stored_values.json"
+DATA_FILE = f"stored_values_{selected_business.replace(' ', '_').lower()}.json"
 
 # Load and Save Session Values
 def save_session_data():
@@ -34,6 +34,11 @@ def load_session_data():
 st.set_page_config(page_title="Profit & Loss - Full Year", layout="wide")
 st.title("📊 Full-Year Profit & Loss Statement")
 st.caption("Track your business performance month-by-month")
+
+# === Business Selection ===
+available_businesses = ["Starbucks", "Target", "MyCo", "New Business"]
+selected_business = st.sidebar.selectbox("Select Your Business", available_businesses)
+st.session_state["business_name"] = selected_business
 
 # Load stored values (if available)
 load_session_data()
@@ -74,7 +79,7 @@ if st.session_state.reset_triggered:
 # === Business Info ===
 col1, col2 = st.columns(2)
 with col1:
-    business_name = st.text_input("Business Name", "My Small Business")
+    business_name = st.text_input("Business Name", selected_business)
 with col2:
     report_year = st.text_input("Year", "2025")
 
