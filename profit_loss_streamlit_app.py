@@ -62,14 +62,14 @@ growth_rate = st.sidebar.number_input("Expected Growth Rate (%)", min_value=0.0,
 
 if st.sidebar.button("Reset All Data"):
     st.session_state.reset_triggered = True
-    st.experimental_rerun()  # Rerun immediately after setting the flag
+    st.rerun()  # Rerun immediately after setting the flag
 
 if st.session_state.reset_triggered:
     if os.path.exists(DATA_FILE):
         os.remove(DATA_FILE)
     st.session_state.clear()
     st.session_state.reset_triggered = False
-    st.experimental_rerun()  # Trigger one final rerun with everything cleared
+    st.rerun()  # Trigger one final rerun with everything cleared
 
 # === Business Info ===
 col1, col2 = st.columns(2)
