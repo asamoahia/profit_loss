@@ -56,12 +56,18 @@ multi_months_filter = st.sidebar.multiselect("Select Multiple Months for Compari
 tax_rate = st.sidebar.number_input("Tax Rate (%)", min_value=0.0, max_value=100.0, value=10.0)
 growth_rate = st.sidebar.number_input("Expected Growth Rate (%)", min_value=0.0, max_value=100.0, value=5.0)
 
+if "reset_triggered" not in st.session_state:
+    st.session_state.reset_triggered = False
+
 if st.sidebar.button("Reset All Data"):
+    st.session_state.reset_triggered = True
+
+if st.session_state.reset_triggered:
     if os.path.exists(DATA_FILE):
         os.remove(DATA_FILE)
     st.session_state.clear()
+    st.session_state.reset_triggered = False
     st.experimental_rerun()
-    st.stop()  # <- Prevents continued script execution
 
 # === Business Info ===
 col1, col2 = st.columns(2)
