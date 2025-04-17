@@ -78,11 +78,9 @@ if uploaded_logo:
     with open(LOGO_FILE, "wb") as f:
         f.write(logo_bytes)
 
-uploaded_logo = st.file_uploader("Upload your business logo (PNG or JPG)", type=["png", "jpg", "jpeg"])
-if uploaded_logo:
-    st.session_state.logo = uploaded_logo
-
-logo_file = st.session_state.logo
+# Display logo if available
+if st.session_state[f"logo_{business_id}"]:
+    st.image(st.session_state[f"logo_{business_id}"], caption=f"{selected_business} Logo", use_column_width=False)
 
 # === Constants ===
 months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
