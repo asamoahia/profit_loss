@@ -60,7 +60,7 @@ if st.sidebar.button("Create Business") and new_business.strip():
         available_businesses.append(clean_name)
         save_businesses(available_businesses)
         selected_business = clean_name  # Auto-select new one
-        st.experimental_rerun()  # Refresh to load new data file
+        st.rerun()  # Refresh to load new data file
 
 # Business-specific datafile
 DATA_FILE = f"stored_values_{selected_business.replace(' ', '_').lower()}.json"
