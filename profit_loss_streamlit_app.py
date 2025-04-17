@@ -61,6 +61,7 @@ if st.sidebar.button("Reset All Data"):
         os.remove(DATA_FILE)
     st.session_state.clear()
     st.experimental_rerun()
+    st.stop()  # <- Prevents continued script execution
 
 # === Business Info ===
 col1, col2 = st.columns(2)
