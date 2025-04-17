@@ -1,24 +1,34 @@
-# %% streamlit_app.py
-import pandas as pd
 import streamlit as st
-import matplotlib.pyplot as plt
+import os
+import json
+import pandas as pd
 import plotly.express as px
 from io import BytesIO
 from fpdf import FPDF
-import tempfile
-import json
-import os
 
-# Place this at the top of your script, after your imports
+# === Get the business name from the URL ===
+query_params = st.experimental_get_query_params()
+business_name_from_url = query_params.get("business", [None])[0]
+
+if business_name_from_url:
+    selected_business = business_name_from_url.replace("_", " ").title()
+else:
+    selected_business = "Default Business"
+
+DATA_FILE = f"stored_values_{selected_business.replace(' ', '_').lower()}.json"
+
+# === Session Handling and Reset Logic ===
 if "reset_triggered" not in st.session_state:
     st.session_state.reset_triggered = False
 
-# Load and Save Session Values
-def save_session_data():
-    data = {key: st.session_state[key] for key in st.session_state if isinstance(st.session_state[key], (int, float, str, bool, list))}
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f)
+if st.sidebar.button("Reset All Data"):
+    st.session_state.reset_triggered = True
+    if os.path.exists(DATA_FILE):
+        os.remove(DATA_FILE)
+    st.session_state.clear()
+    st.experimental_rerun()
 
+# === Load and Save Session Data ===
 def load_session_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
@@ -27,180 +37,80 @@ def load_session_data():
                 if key not in st.session_state:
                     st.session_state[key] = value
 
-# === Streamlit Page Setup ===
-st.set_page_config(page_title="Profit & Loss - Full Year", layout="wide")
-st.title("📊 Full-Year Profit & Loss Statement")
-st.caption("Track your business performance month-by-month")
+def save_session_data():
+    data = {key: st.session_state[key] for key in st.session_state if isinstance(st.session_state[key], (int, float, str, bool, list))}
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f)
 
-# Define a JSON file to store available businesses
-BUSINESSES_FILE = "business_list.json"
-
-# Helper Functions
-def load_businesses():
-    if os.path.exists(BUSINESSES_FILE):
-        with open(BUSINESSES_FILE, "r") as f:
-            return json.load(f)
-    return ["Default Business"]
-
-def save_businesses(businesses):
-    with open(BUSINESSES_FILE, "w") as f:
-        json.dump(businesses, f)
-
-# === Load business list ===
-available_businesses = load_businesses()
-
-# === Business Selection UI ===
-st.sidebar.markdown("### Select or Create Business")
-selected_business = st.sidebar.selectbox("Select Existing Business", available_businesses)
-
-new_business = st.sidebar.text_input("Or Enter New Business Name")
-if st.sidebar.button("Create Business") and new_business.strip():
-    clean_name = new_business.strip()
-    if clean_name not in available_businesses:
-        available_businesses.append(clean_name)
-        save_businesses(available_businesses)
-        selected_business = clean_name  # Auto-select new one
-        st.rerun()  # Refresh to load new data file
-
-# Business-specific datafile
-DATA_FILE = f"stored_values_{selected_business.replace(' ', '_').lower()}.json"
-
-# Load stored values (if available)
 load_session_data()
 
-# === Persistent Logo Upload ===
-if "logo" not in st.session_state:
-    st.session_state.logo = None
+# === Business Name Input ===
+st.sidebar.markdown("### 🏢 Select or Create Business")
+business_list = [
+    f.replace("stored_values_", "").replace(".json", "").replace("_", " ").title()
+    for f in os.listdir() if f.startswith("stored_values_") and f.endswith(".json")
+]
 
-uploaded_logo = st.file_uploader("Upload your business logo (PNG or JPG)", type=["png", "jpg", "jpeg"])
-if uploaded_logo:
-    st.session_state.logo = uploaded_logo
+selected_business = st.sidebar.selectbox("Choose a Business", ["Create New..."] + business_list)
 
-logo_file = st.session_state.logo
+if selected_business == "Create New...":
+    new_business_name = st.sidebar.text_input("Enter New Business Name")
+    if new_business_name:
+        selected_business = new_business_name.strip().title()
+else:
+    selected_business = selected_business.strip().title()
 
-# === Constants ===
-months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-target_length = 12
+DATA_FILE = f"stored_values_{selected_business.replace(' ', '_').lower()}.json"
 
-# === Sidebar Filters ===
-month_filter = st.sidebar.selectbox("Select Month", ["All"] + months)
-multi_months_filter = st.sidebar.multiselect("Select Multiple Months for Comparison", months)
+# === Load Data based on selected business ===
+load_session_data()
 
-tax_rate = st.sidebar.number_input("Tax Rate (%)", min_value=0.0, max_value=100.0, value=10.0)
-growth_rate = st.sidebar.number_input("Expected Growth Rate (%)", min_value=0.0, max_value=100.0, value=5.0)
+# === Inputs and Calculations (similar to previous) ===
+# Let's use a helper function to set up monthly inputs and use the session state to retain values
 
-if st.sidebar.button("Reset All Data"):
-    st.session_state.reset_triggered = True
-    st.rerun()  # Rerun immediately after setting the flag
+months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-if st.session_state.reset_triggered:
-    if os.path.exists(DATA_FILE):
-        os.remove(DATA_FILE)
-    st.session_state.clear()
-    st.session_state.reset_triggered = False
-    st.rerun()  # Trigger one final rerun with everything cleared
-
-# === Business Info ===
-col1, col2 = st.columns(2)
-with col1:
-    business_name = st.text_input("Business Name", selected_business)
-with col2:
-    report_year = st.text_input("Year", "2025")
-
-# Monthly Input Helper Function
 def monthly_inputs(label, default=0.0):
-    st.markdown(f"**{label}**")
     input_values = []
-
+    
     for i, month in enumerate(months):
         key = f"{label}_{i}"
-
-        # Initialize session state if not already set
+        
+        # Initialize session state value before widget creation
         if key not in st.session_state:
-            st.session_state[key] = default
-
-        # Only pass 'value' during widget creation if the session state just got initialized
-        input_value = st.number_input(
-            f"{label} - {month}",
-            min_value=0.0,
-            step=0.01,
-            key=key
-        )
-
+            st.session_state[key] = default  # Set default value if not set already
+        
+        # Use the session state value directly as the value, without setting it again as default in the widget
+        value = st.session_state[key]  # Get value from session state
+        input_value = st.number_input(f"{label} - {month}", min_value=0.0, value=value, step=0.01, key=key)
+        
+        # Store the new value into session state only if it's updated
+        if input_value != value:
+            st.session_state[key] = input_value
+        
         input_values.append(input_value)
-
+        
     return input_values
 
-# === COLUMNS SECTION START ===
-col_rev, col_exp, col_res = st.columns(3)
+# === Display the input fields for business data ===
+st.subheader(f"Manage Data for {selected_business}")
 
-# --- Revenue and Targets ---
-with col_rev:
-    st.subheader("💰 Revenue & Targets (Monthly)")
-    revenue = monthly_inputs("Revenue")
-    target_revenue = monthly_inputs("Target Revenue")
+# --- Revenue and Expenses Inputs ---
+revenue = monthly_inputs("Revenue")
+target_revenue = monthly_inputs("Target Revenue")
+marketing = monthly_inputs("Marketing")
+salaries = monthly_inputs("Salaries")
+utilities = monthly_inputs("Utilities")
+rent = monthly_inputs("Rent")
+other_expenses = monthly_inputs("Other Expenses")
 
-# --- Expenses Breakdown ---
-with col_exp:
-    st.subheader("🧾 Expenses (Monthly)")
-
-    marketing = monthly_inputs("Marketing")
-    salaries = monthly_inputs("Salaries")
-    utilities = monthly_inputs("Utilities")
-    rent = monthly_inputs("Rent")
-    other_expenses = monthly_inputs("Other Expenses")
-
-    # Custom Expenses
-    st.markdown("**Add Custom Expense Categories**")
-    custom_categories_input = st.text_input("Comma-separated (e.g., Taxes, Insurance)", "Taxes, Insurance")
-    custom_expense_categories = [c.strip() for c in custom_categories_input.split(',') if c.strip()]
-
-    custom_expenses_data = {}
-    for cat in custom_expense_categories:
-        custom_expenses_data[cat] = monthly_inputs(cat)
-
-# --- COGS, Projections & Results ---
-with col_res:
-    st.subheader("⚙️ COGS & Projections (Monthly)")
-    cogs = monthly_inputs("COGS")
-    target_expenses = monthly_inputs("Target Expenses")
-
-# Capture All Inputs
+# --- Save Data after inputs ===
 save_session_data()
 
-# === Calculations ===
-
-# Total Fixed Expenses per Month
-fixed_expenses = [sum(x) for x in zip(marketing, salaries, utilities, rent, other_expenses)]
-
-# Total Custom Expenses per Month
-custom_totals = [sum(custom_expenses_data[cat][i] for cat in custom_expense_categories) for i in range(12)]
-
-# Total Expenses = Fixed + Custom
-total_expenses = [f + c for f, c in zip(fixed_expenses, custom_totals)]
-
-# Gross Profit = Revenue - COGS
-gross_profit = [rev - cost for rev, cost in zip(revenue, cogs)]
-
-# Net Profit = Gross - Expenses
-net_profit = [gp - exp for gp, exp in zip(gross_profit, total_expenses)]
-
-# Profit Margin (%) = (Net Profit / Revenue) * 100
-profit_margin = [(np / rev * 100) if rev != 0 else 0 for np, rev in zip(net_profit, revenue)]
-
-# Taxes
-taxes = [np * (tax_rate / 100) for np in net_profit]
-net_profit_after_tax = [np - tax for np, tax in zip(net_profit, taxes)]
-
-# Projections
-projected_revenue = [rev * (1 + growth_rate / 100) for rev in revenue]
-projected_expenses = [exp * (1 + growth_rate / 100) for exp in total_expenses]
-projected_net_profit = [r - e for r, e in zip(projected_revenue, projected_expenses)]
-
-# Variance Calculations
-revenue_variance = [rev - tgt for rev, tgt in zip(revenue, target_revenue)]
-expense_variance = [exp - tgt for exp, tgt in zip(total_expenses, target_expenses)]
+# === Show Calculations (e.g., Net Profit, Revenue Over Time) ===
+# Example: Calculate Net Profit (Revenue - Expenses)
+total_expenses = [sum(x) for x in zip(marketing, salaries, utilities, rent, other_expenses)]
+net_profit = [rev - exp for rev, exp in zip(revenue, total_expenses)]
 
 # === Final DataFrame Construction ===
 df = pd.DataFrame({
