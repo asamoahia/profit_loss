@@ -82,26 +82,24 @@ with col2:
 def monthly_inputs(label, default=0.0):
     st.markdown(f"**{label}**")
     input_values = []
-    
+
     for i, month in enumerate(months):
         key = f"{label}_{i}"
-        
-        # Initialize session state value before widget creation
+
+        # Initialize session state if not already set
         if key not in st.session_state:
-            st.session_state[key] = default  # Set default value if not set already
-        
-        # Only use session state value if the user hasn't set one for this widget
-        value = st.session_state[key]  # Get value from session state
-        
-        # Use the session state value directly as the value, without setting it again as default in the widget
-        input_value = st.number_input(f"{label} - {month}", min_value=0.0, value=value, step=0.01, key=key)
-        
-        # Store the new value into session state only if it's updated
-        if input_value != value:
-            st.session_state[key] = input_value
-        
+            st.session_state[key] = default
+
+        # Only pass 'value' during widget creation if the session state just got initialized
+        input_value = st.number_input(
+            f"{label} - {month}",
+            min_value=0.0,
+            step=0.01,
+            key=key
+        )
+
         input_values.append(input_value)
-        
+
     return input_values
 
 # === COLUMNS SECTION START ===
