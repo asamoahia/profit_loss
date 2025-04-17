@@ -13,9 +13,6 @@ import os
 if "reset_triggered" not in st.session_state:
     st.session_state.reset_triggered = False
 
-# Set the data file path for storing session data
-DATA_FILE = f"stored_values_{selected_business.replace(' ', '_').lower()}.json"
-
 # Load and Save Session Values
 def save_session_data():
     data = {key: st.session_state[key] for key in st.session_state if isinstance(st.session_state[key], (int, float, str, bool, list))}
@@ -39,6 +36,9 @@ st.caption("Track your business performance month-by-month")
 available_businesses = ["Starbucks", "Target", "MyCo", "New Business"]
 selected_business = st.sidebar.selectbox("Select Your Business", available_businesses)
 st.session_state["business_name"] = selected_business
+
+# Business-specific datafile
+DATA_FILE = f"stored_values_{selected_business.replace(' ', '_').lower()}.json"
 
 # Load stored values (if available)
 load_session_data()
